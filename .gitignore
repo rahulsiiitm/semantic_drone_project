@@ -1,0 +1,22 @@
+# Ignore System Files
+.DS_Store
+Thumbs.db
+
+# Ignore VS Code Local Settings
+.vscode/
+
+# Ignore Python Cache
+__pycache__/
+*.pyc
+*.pyo
+venv/
+
+# Ignore ROS 2 Build Artifacts (CRITICAL)
+build/
+install/
+log/
+COLCON_IGNORE
+
+# Ignore Heavy Models (Optional - if >100MB)
+*.onnx
+*.engine
