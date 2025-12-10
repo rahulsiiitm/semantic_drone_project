@@ -47,6 +47,12 @@ install(DIRECTORY include/
 install(FILES nav2_plugins.xml
   DESTINATION share/${PROJECT_NAME})
 
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME})
+
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME})
+
 ament_export_libraries(semantic_layer_lib)
 ament_export_include_directories(include)
 ament_export_dependencies(rclcpp nav2_costmap_2d)
