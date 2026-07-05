@@ -4,7 +4,7 @@
 cd /home/drone_user/workspace
 
 echo "Installing required Python dependencies for PX4..."
-pip3 install --user kconfiglib jinja2 jsonschema future packaging toml numpy pyyaml empy==3.3.4
+pip3 install --user kconfiglib jinja2 jsonschema future packaging toml numpy pyyaml empy==3.3.4 pyros-genmsg
 
 cd simulation
 if [ ! -d "PX4-Autopilot" ]; then

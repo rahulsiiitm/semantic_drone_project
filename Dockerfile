@@ -14,6 +14,15 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libgl1-mesa-dri \
     python3-colcon-common-extensions \
+    lsb-release \
+    gnupg \
+    protobuf-compiler \
+    libprotobuf-dev \
+    && wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list \
+    && apt-get update && apt-get install -y \
+    gz-harmonic \
+    libunwind-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Add a non-root user matching the host user to avoid permission issues with mounted volumes

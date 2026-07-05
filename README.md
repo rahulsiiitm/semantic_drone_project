@@ -4,7 +4,7 @@
 [![ROS 2](https://img.shields.io/badge/ROS_2-Humble-blue.svg)](https://docs.ros.org/en/humble/)
 [![Simulation](https://img.shields.io/badge/Simulation-PX4%20SITL-orange.svg)](https://px4.io/)
 [![Hardware](https://img.shields.io/badge/Hardware-Jetson_Nano-green.svg)](https://developer.nvidia.com/embedded/jetson-nano-developer-kit)
-[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active_Development-yellow.svg)]()
 
 A ground-up autopilot stack for semantically-aware, edge-deployed autonomous flight. Rather than treating navigation as pure geometric obstacle avoidance, this system fuses camera and LiDAR modalities through deep learning so the drone reasons about *what* it sees, not just *where* things are — distinguishing a person from a tree, a wire from open air, a rooftop from a hazard.
@@ -116,7 +116,7 @@ Issues and PRs are welcome, particularly around costmap plugin performance, Jets
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under a Proprietary License — see the [LICENSE](LICENSE) file for details. All rights reserved.
 
 ---
 
