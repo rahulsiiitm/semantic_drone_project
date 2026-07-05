@@ -26,7 +26,11 @@ RUN apt-get update && apt-get install -y \
     ros-humble-navigation2 \
     ros-humble-nav2-costmap-2d \
     ros-humble-vision-msgs \
+    ros-humble-cv-bridge \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Python AI libraries (Pin numpy < 2 and opencv < 4.9 for cv_bridge compatibility)
+RUN pip3 install --no-cache-dir ultralytics "opencv-python==4.8.1.78" "numpy<2"
 
 # Add a non-root user matching the host user to avoid permission issues with mounted volumes
 ARG USERNAME=drone_user
