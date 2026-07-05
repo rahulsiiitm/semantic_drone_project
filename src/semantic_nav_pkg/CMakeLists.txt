@@ -22,11 +22,11 @@ target_include_directories(semantic_layer_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(semantic_layer_lib
-  nav2_costmap_2d::nav2_costmap_2d
-  rclcpp::rclcpp
-  sensor_msgs::sensor_msgs
-  pluginlib::pluginlib)
+ament_target_dependencies(semantic_layer_lib
+  nav2_costmap_2d
+  rclcpp
+  sensor_msgs
+  pluginlib)
 
 # 4. Register the Plugin
 # This allows ROS 2 to "discover" your plugin at runtime

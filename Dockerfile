@@ -23,6 +23,9 @@ RUN apt-get update && apt-get install -y \
     && apt-get update && apt-get install -y \
     gz-harmonic \
     libunwind-dev \
+    ros-humble-navigation2 \
+    ros-humble-nav2-costmap-2d \
+    ros-humble-vision-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # Add a non-root user matching the host user to avoid permission issues with mounted volumes
