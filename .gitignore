@@ -23,3 +23,5 @@ COLCON_IGNORE
 
 # Ignore Simulation dependencies
 simulation/PX4-Autopilot/
+Micro-XRCE-DDS-Agent/
+src/px4_msgs/
