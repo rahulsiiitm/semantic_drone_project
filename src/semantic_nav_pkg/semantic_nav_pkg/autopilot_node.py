@@ -132,7 +132,14 @@ class AutopilotNode(Node):
         final_velocity = waypoint_velocity + global_avoidance
         
         msg.velocity = [float(final_velocity[0]), float(final_velocity[1]), float(final_velocity[2])]
-        msg.yaw = math.atan2(final_velocity[1], final_velocity[0]) # Point nose towards movement direction
+        
+        # FIX: Always face the target waypoint. 
+        # If we face the final_velocity, the drone will rapidly shake left/right as it dodges and loses sight of the obstacle!
+        if distance > 0.5:
+            msg.yaw = math.atan2(direction[1], direction[0])
+        else:
+            msg.yaw = self.drone_yaw # Keep current yaw if hovering at destination
+
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         
         self.trajectory_setpoint_publisher.publish(msg)
