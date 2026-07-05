@@ -16,6 +16,14 @@ make
 sudo make install
 sudo ldconfig /usr/local/lib/
 
+echo "Downloading px4_msgs for ROS 2 workspace..."
+cd /home/drone_user/workspace/src
+if [ ! -d "px4_msgs" ]; then
+    git clone https://github.com/PX4/px4_msgs.git
+fi
+
+cd /home/drone_user/workspace
+
 echo "---------------------------------------------------"
 echo "Micro XRCE-DDS Agent installed successfully!"
 echo "To start the bridge, open a new terminal in the container and run:"
