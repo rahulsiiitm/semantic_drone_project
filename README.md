@@ -1,6 +1,6 @@
-# Semantic Drone Autopilot: Advanced Edge-Based Autonomy
+# Vyoma: Semantic Drone Autopilot
 
-![Semantic Drone Autopilot Workbench](assets/banner.jpg)
+![Vyoma Workbench](assets/banner.jpg)
 [![ROS 2](https://img.shields.io/badge/ROS_2-Humble-blue.svg)](https://docs.ros.org/en/humble/)
 [![Simulation](https://img.shields.io/badge/Simulation-PX4%20SITL-orange.svg)](https://px4.io/)
 [![Hardware](https://img.shields.io/badge/Hardware-Jetson_Nano-green.svg)](https://developer.nvidia.com/embedded/jetson-nano-developer-kit)
