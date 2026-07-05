@@ -20,3 +20,6 @@ COLCON_IGNORE
 # Ignore Heavy Models (Optional - if >100MB)
 *.onnx
 *.engine
+
+# Ignore Simulation dependencies
+simulation/PX4-Autopilot/
