@@ -11,15 +11,7 @@ def generate_launch_description():
     
     nav2_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
 
-    # 1. Vision Node (The Eyes)
-    vision_node = Node(
-        package='semantic_vision_pkg',
-        executable='vision_node',
-        output='screen',
-        name='semantic_vision'
-    )
-
-    # 2. Nav2 Stack (The Brain)
+    # Nav2 Stack (The Brain)
     nav2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(nav2_share, 'launch', 'navigation_launch.py')),
         launch_arguments={
@@ -28,7 +20,7 @@ def generate_launch_description():
         }.items()
     )
 
-    # 3. RViz (The Visualizer)
+    # RViz (The Visualizer)
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -37,7 +29,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        vision_node,
         nav2_launch,
         rviz_node
     ])

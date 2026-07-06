@@ -4,6 +4,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleStatus, VehicleOdometry
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool
+from geometry_msgs.msg import Twist
 import numpy as np
 import math
 from enum import Enum
@@ -42,6 +43,8 @@ class AutopilotNode(Node):
             Image, '/semantic_mask', self.mask_callback, 10)
         self.emergency_stop_subscriber = self.create_subscription(
             Bool, '/emergency_stop', self.estop_callback, 10)
+        self.cmd_vel_subscriber = self.create_subscription(
+            Twist, '/cmd_vel', self.cmd_vel_callback, 10)
 
         # State Variables
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
@@ -51,10 +54,9 @@ class AutopilotNode(Node):
         self.flight_state = FlightState.IDLE
         self.emergency_stop_active = False
         
-        # Destination Waypoint (NED coordinates: North, East, Down)
-        # Assuming starting at 0, 0, we want to fly North by 20 meters, at 5m height.
-        self.target_waypoint = np.array([20.0, 0.0, -5.0])
+        # Target Variables
         self.target_altitude = -5.0
+        self.nav2_velocity = np.array([0.0, 0.0])
         
         # Reactive Control Variables
         self.avoidance_vector = np.array([0.0, 0.0, 0.0])
@@ -76,6 +78,21 @@ class AutopilotNode(Node):
         # Extract yaw from quaternion
         q = msg.q
         self.drone_yaw = math.atan2(2.0 * (q[0] * q[3] + q[1] * q[2]), 1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3]))
+
+    def cmd_vel_callback(self, msg):
+        # Nav2 outputs /cmd_vel in the base_link frame (X is forward, Y is lateral)
+        # We must convert this to the global NED frame for PX4
+        rot_matrix = np.array([
+            [math.cos(self.drone_yaw), -math.sin(self.drone_yaw)],
+            [math.sin(self.drone_yaw),  math.cos(self.drone_yaw)]
+        ])
+        
+        body_vel = np.array([msg.linear.x, msg.linear.y])
+        global_vel = rot_matrix.dot(body_vel)
+        self.nav2_velocity = global_vel
+
+        # Pass through yaw rate if Nav2 commands turning
+        self.nav2_yaw_rate = msg.angular.z
 
     def mask_callback(self, msg):
         # Convert ROS Image to Numpy array
@@ -145,24 +162,12 @@ class AutopilotNode(Node):
                 self.flight_state = FlightState.NAVIGATE
 
         elif self.flight_state == FlightState.NAVIGATE:
-            # 1. Calculate Vector to Waypoint (Global Frame)
-            target_xy = np.array([self.target_waypoint[0], self.target_waypoint[1]])
-            current_xy = np.array([self.drone_position[0], self.drone_position[1]])
-            direction_xy = target_xy - current_xy
-            distance_xy = np.linalg.norm(direction_xy)
-            
             # Altitude holding
             altitude_error = self.target_altitude - self.drone_position[2]
             z_vel = max(-1.0, min(1.0, altitude_error))
             
-            if distance_xy > 0.5:
-                direction_normalized = direction_xy / distance_xy
-                # Cap speed at 2 m/s
-                waypoint_velocity_xy = direction_normalized * min(distance_xy, 2.0) 
-            else:
-                self.get_logger().info('Waypoint reached. Switching to LAND.')
-                self.flight_state = FlightState.LAND
-                waypoint_velocity_xy = np.array([0.0, 0.0])
+            # Use Nav2 Velocities for X and Y
+            waypoint_velocity_xy = self.nav2_velocity
 
             # 2. Add Avoidance Vector (Body Frame to Global Frame mapping simplified)
             rot_matrix = np.array([
@@ -174,7 +179,6 @@ class AutopilotNode(Node):
 
             # 3. Final Velocity Command
             if self.emergency_stop_active:
-                # Override forward and avoidance velocities to halt horizontally
                 waypoint_velocity_xy = np.array([0.0, 0.0])
                 global_avoidance_xy = np.array([0.0, 0.0])
                 self.get_logger().warn('EMERGENCY STOP ACTIVE! Halting horizontal flight.', throttle_duration_sec=1.0)
@@ -183,9 +187,12 @@ class AutopilotNode(Node):
             
             msg.velocity = [float(final_velocity_xy[0]), float(final_velocity_xy[1]), float(z_vel)]
             
-            # FIX: Always face the target waypoint, unless dodged heavily. 
-            if distance_xy > 0.5:
-                msg.yaw = math.atan2(direction_xy[1], direction_xy[0])
+            # Use Nav2's commanded yaw rate to turn the drone
+            # Integrating yaw rate into a target yaw is complex in offboard velocity control, 
+            # so we just let Nav2 command velocities while facing forward for now, 
+            # or we slowly turn the yaw based on nav2_yaw_rate.
+            if hasattr(self, 'nav2_yaw_rate'):
+                msg.yaw = self.drone_yaw + (self.nav2_yaw_rate * 0.1) # integrate yaw rate
             else:
                 msg.yaw = self.drone_yaw
                 

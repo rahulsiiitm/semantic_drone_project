@@ -19,6 +19,7 @@ cd PX4-Autopilot
 echo "Building PX4 SITL and Gazebo target..."
 echo "This will take a while on the first run as it compiles the entire flight stack."
 # DONT_RUN=1 ensures it just builds and doesn't immediately launch the simulator
+export PX4_GZ_WORLD=walls
 DONT_RUN=1 make px4_sitl gz_x500_depth
 
 echo "---------------------------------------------------"

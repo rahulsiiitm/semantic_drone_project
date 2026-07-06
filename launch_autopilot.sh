@@ -21,17 +21,22 @@ echo "1/4 Starting MicroXRCEAgent (Bridge to PX4)..."
 docker exec -d $CONTAINER_ID bash -c "~/workspace/Micro-XRCE-DDS-Agent/build/MicroXRCEAgent udp4 -p 8888"
 sleep 2
 
-echo "2/4 Starting ROS-Gazebo Bridge (Camera Feed)..."
-docker exec -d $CONTAINER_ID bash -c "source /opt/ros/humble/setup.bash && ros2 run ros_gz_bridge parameter_bridge /world/default/model/x500_depth_0/link/camera_link/sensor/IMX214/image@sensor_msgs/msg/Image@gz.msgs.Image --ros-args -r /world/default/model/x500_depth_0/link/camera_link/sensor/IMX214/image:=/camera/image_raw"
+echo "2/4 Starting ROS-Gazebo Bridge (Camera Feed & Depth Cloud)..."
+docker exec -d $CONTAINER_ID bash -c "source /opt/ros/humble/setup.bash && ros2 run ros_gz_bridge parameter_bridge \
+    /world/default/model/x500_depth_0/link/camera_link/sensor/IMX214/image@sensor_msgs/msg/Image@gz.msgs.Image \
+    /world/walls/model/x500_depth_0/link/camera_link/sensor/IMX214/image@sensor_msgs/msg/Image@gz.msgs.Image \
+    /depth_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked \
+    --ros-args -r /world/default/model/x500_depth_0/link/camera_link/sensor/IMX214/image:=/camera/image_raw \
+    -r /world/walls/model/x500_depth_0/link/camera_link/sensor/IMX214/image:=/camera/image_raw"
 sleep 2
 
 echo "3/4 Starting YOLOv8 Semantic Vision Node..."
-docker exec -d $CONTAINER_ID bash -c "source ~/workspace/install/setup.bash && ros2 run semantic_vision_pkg vision_node --ros-args -p use_webcam:=false"
+docker exec -d $CONTAINER_ID bash -c "source /opt/ros/humble/setup.bash && source ~/workspace/install/setup.bash && ros2 run semantic_vision_pkg vision_node --ros-args -p use_webcam:=false"
 sleep 2
 
-echo "3.5/4 Starting LiDAR Obstacle Processor..."
-docker exec -d $CONTAINER_ID bash -c "source ~/workspace/install/setup.bash && ros2 run semantic_nav_pkg lidar_processor_node"
-sleep 2
+echo "3.8/4 Launching Nav2 Stack & RViz..."
+docker exec -d $CONTAINER_ID bash -c "source /opt/ros/humble/setup.bash && source ~/workspace/install/setup.bash && ros2 launch semantic_nav_pkg semantic_drone.launch.py"
+sleep 5
 
 echo "4/4 Engaging Reactive Autopilot Node! 🛫"
 docker exec -it $CONTAINER_ID bash -c "source /opt/ros/humble/setup.bash && source ~/workspace/install/setup.bash && ros2 run semantic_nav_pkg autopilot_node"
