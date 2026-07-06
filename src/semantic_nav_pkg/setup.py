@@ -22,7 +22,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'autopilot_node = semantic_nav_pkg.autopilot_node:main'
+            'autopilot_node = semantic_nav_pkg.autopilot_node:main',
+            'lidar_processor_node = semantic_nav_pkg.lidar_processor_node:main'
         ],
     },
 )

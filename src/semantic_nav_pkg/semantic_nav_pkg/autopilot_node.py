@@ -3,8 +3,16 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleStatus, VehicleOdometry
 from sensor_msgs.msg import Image
+from std_msgs.msg import Bool
 import numpy as np
 import math
+from enum import Enum
+
+class FlightState(Enum):
+    IDLE = 0
+    TAKEOFF = 1
+    NAVIGATE = 2
+    LAND = 3
 
 class AutopilotNode(Node):
     def __init__(self):
@@ -32,16 +40,21 @@ class AutopilotNode(Node):
             VehicleOdometry, '/fmu/out/vehicle_odometry', self.odometry_callback, qos_profile)
         self.semantic_mask_subscriber = self.create_subscription(
             Image, '/semantic_mask', self.mask_callback, 10)
+        self.emergency_stop_subscriber = self.create_subscription(
+            Bool, '/emergency_stop', self.estop_callback, 10)
 
         # State Variables
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
         self.offboard_setpoint_counter = 0
         self.drone_position = np.array([0.0, 0.0, 0.0])
         self.drone_yaw = 0.0
-
+        self.flight_state = FlightState.IDLE
+        self.emergency_stop_active = False
+        
         # Destination Waypoint (NED coordinates: North, East, Down)
         # Assuming starting at 0, 0, we want to fly North by 20 meters, at 5m height.
         self.target_waypoint = np.array([20.0, 0.0, -5.0])
+        self.target_altitude = -5.0
         
         # Reactive Control Variables
         self.avoidance_vector = np.array([0.0, 0.0, 0.0])
@@ -51,6 +64,9 @@ class AutopilotNode(Node):
 
     def vehicle_status_callback(self, vehicle_status):
         self.nav_state = vehicle_status.nav_state
+
+    def estop_callback(self, msg):
+        self.emergency_stop_active = msg.data
 
     def odometry_callback(self, msg):
         self.drone_position[0] = msg.position[0]
@@ -106,42 +122,85 @@ class AutopilotNode(Node):
 
     def publish_trajectory_setpoint(self):
         msg = TrajectorySetpoint()
-
-        # 1. Calculate Vector to Waypoint (Global Frame)
-        direction = self.target_waypoint - self.drone_position
-        distance = np.linalg.norm(direction)
         
-        if distance > 0.5:
-            direction_normalized = direction / distance
-            # Cap speed at 2 m/s
-            waypoint_velocity = direction_normalized * min(distance, 2.0) 
-        else:
-            waypoint_velocity = np.array([0.0, 0.0, 0.0]) # Reached destination
+        # PX4 REQUIRES unused fields to be explicitly set to NaN! 
+        # Otherwise it thinks we are commanding position [0,0,0] (the ground).
+        msg.position = [float('nan'), float('nan'), float('nan')]
+        msg.acceleration = [float('nan'), float('nan'), float('nan')]
+        msg.jerk = [float('nan'), float('nan'), float('nan')]
 
-        # 2. Add Avoidance Vector (Body Frame to Global Frame mapping simplified)
-        # Avoidance vector is relative to drone (Y is right/left). 
-        # Rotate avoidance vector by drone's yaw to get global vector.
-        rot_matrix = np.array([
-            [math.cos(self.drone_yaw), -math.sin(self.drone_yaw), 0],
-            [math.sin(self.drone_yaw),  math.cos(self.drone_yaw), 0],
-            [0, 0, 1]
-        ])
-        global_avoidance = rot_matrix.dot(self.avoidance_vector)
+        if self.flight_state == FlightState.IDLE:
+            msg.velocity = [0.0, 0.0, 0.0]
+            msg.yaw = self.drone_yaw
+        
+        elif self.flight_state == FlightState.TAKEOFF:
+            # Ascend to target altitude
+            altitude_error = self.target_altitude - self.drone_position[2]
+            ascend_speed = max(-1.5, min(1.5, altitude_error)) # P-controller for altitude
+            msg.velocity = [0.0, 0.0, float(ascend_speed)]
+            msg.yaw = self.drone_yaw
+            
+            if abs(altitude_error) < 0.5:
+                self.get_logger().info('Takeoff complete. Switching to NAVIGATE.')
+                self.flight_state = FlightState.NAVIGATE
 
-        # 3. Final Velocity Command
-        final_velocity = waypoint_velocity + global_avoidance
-        
-        msg.velocity = [float(final_velocity[0]), float(final_velocity[1]), float(final_velocity[2])]
-        
-        # FIX: Always face the target waypoint. 
-        # If we face the final_velocity, the drone will rapidly shake left/right as it dodges and loses sight of the obstacle!
-        if distance > 0.5:
-            msg.yaw = math.atan2(direction[1], direction[0])
-        else:
-            msg.yaw = self.drone_yaw # Keep current yaw if hovering at destination
+        elif self.flight_state == FlightState.NAVIGATE:
+            # 1. Calculate Vector to Waypoint (Global Frame)
+            target_xy = np.array([self.target_waypoint[0], self.target_waypoint[1]])
+            current_xy = np.array([self.drone_position[0], self.drone_position[1]])
+            direction_xy = target_xy - current_xy
+            distance_xy = np.linalg.norm(direction_xy)
+            
+            # Altitude holding
+            altitude_error = self.target_altitude - self.drone_position[2]
+            z_vel = max(-1.0, min(1.0, altitude_error))
+            
+            if distance_xy > 0.5:
+                direction_normalized = direction_xy / distance_xy
+                # Cap speed at 2 m/s
+                waypoint_velocity_xy = direction_normalized * min(distance_xy, 2.0) 
+            else:
+                self.get_logger().info('Waypoint reached. Switching to LAND.')
+                self.flight_state = FlightState.LAND
+                waypoint_velocity_xy = np.array([0.0, 0.0])
+
+            # 2. Add Avoidance Vector (Body Frame to Global Frame mapping simplified)
+            rot_matrix = np.array([
+                [math.cos(self.drone_yaw), -math.sin(self.drone_yaw)],
+                [math.sin(self.drone_yaw),  math.cos(self.drone_yaw)]
+            ])
+            avoidance_xy = np.array([self.avoidance_vector[0], self.avoidance_vector[1]])
+            global_avoidance_xy = rot_matrix.dot(avoidance_xy)
+
+            # 3. Final Velocity Command
+            if self.emergency_stop_active:
+                # Override forward and avoidance velocities to halt horizontally
+                waypoint_velocity_xy = np.array([0.0, 0.0])
+                global_avoidance_xy = np.array([0.0, 0.0])
+                self.get_logger().warn('EMERGENCY STOP ACTIVE! Halting horizontal flight.', throttle_duration_sec=1.0)
+            
+            final_velocity_xy = waypoint_velocity_xy + global_avoidance_xy
+            
+            msg.velocity = [float(final_velocity_xy[0]), float(final_velocity_xy[1]), float(z_vel)]
+            
+            # FIX: Always face the target waypoint, unless dodged heavily. 
+            if distance_xy > 0.5:
+                msg.yaw = math.atan2(direction_xy[1], direction_xy[0])
+            else:
+                msg.yaw = self.drone_yaw
+                
+        elif self.flight_state == FlightState.LAND:
+            # Descend
+            msg.velocity = [0.0, 0.0, 1.0] # 1.0 m/s down
+            msg.yaw = self.drone_yaw
+            
+            # Simple landing detection: if we are close to ground (z ~ 0 or positive)
+            if self.drone_position[2] > -0.2:
+                self.get_logger().info('Touchdown detected. Disarming.')
+                self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=0.0) # Disarm
+                self.flight_state = FlightState.IDLE
 
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        
         self.trajectory_setpoint_publisher.publish(msg)
 
     def publish_vehicle_command(self, command, **kwargs):
@@ -164,9 +223,12 @@ class AutopilotNode(Node):
 
     def timer_callback(self):
         # 1. Arm and switch to offboard mode
-        if self.offboard_setpoint_counter == 10:
+        # Wait 2 seconds (20 ticks) to ensure PX4 has a steady stream of setpoints before arming
+        if self.offboard_setpoint_counter == 20:
             self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0) # Offboard mode
             self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0) # Arm
+            self.flight_state = FlightState.TAKEOFF
+            self.get_logger().info('Arming command sent. Offboard mode enabled. Starting TAKEOFF.')
         
         # 2. Publish offboard heartbeat (must be published before switching to offboard)
         self.publish_offboard_control_mode()
@@ -174,7 +236,7 @@ class AutopilotNode(Node):
         # 3. Publish setpoints
         self.publish_trajectory_setpoint()
 
-        if self.offboard_setpoint_counter < 11:
+        if self.offboard_setpoint_counter < 21:
             self.offboard_setpoint_counter += 1
 
 def main(args=None):

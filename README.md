@@ -38,6 +38,10 @@ The stack is organized into three tightly-coupled layers, each independently tes
 - **Micro XRCE-DDS Bridge:** Low-latency, real-time bridge between ROS 2 decision-making nodes and the PX4 flight controller.
 - **Edge Optimization:** Inference and point cloud pipelines are profiled and optimized specifically for the Jetson Nano's Maxwell GPU and ARM CPU — model quantization, frame skipping under load, and asynchronous pipeline staging keep the control loop within real-time bounds.
 
+### 4. Ground Control Station (Web UI)
+- **Real-time Telemetry & Map:** A modern web-based control center that streams the drone's live GPS location, traces its historical flight path on an interactive map, and monitors system vitals.
+- **Video & Semantic Streaming:** Live low-latency video streaming of the drone's primary camera and overlaid semantic segmentation masks.
+- **Remote Command:** Set target destination waypoints (Latitude/Longitude) directly from the map interface to command the drone.
 ---
 
 ## Project Structure
@@ -51,6 +55,7 @@ semantic_drone_project/
 ├── simulation/
 │   ├── models/                 # Custom Gazebo models (Quadcopter, Camera, LiDAR)
 │   └── worlds/                 # Custom Gazebo simulation worlds (topology testing)
+├── control_center/             # Modern Web App (React/Vite) for the Ground Control Station
 └── src/
     ├── semantic_nav_pkg/       # C++ ROS 2 package: Nav2 plugins, LiDAR processing, topology
     └── semantic_vision_pkg/    # Python ROS 2 package: YOLO inference, camera feeds
@@ -98,13 +103,33 @@ The full environment is containerized to eliminate ROS 2 dependency conflicts ac
 
 ## Roadmap & Current Status
 
+### Phase 1: Environment & Bridge Setup
 - [x] Dockerized ROS 2 Humble environment configuration
 - [x] PX4 SITL & Gazebo build scripts
 - [x] Micro XRCE-DDS bridge setup & telemetry verification
-- [ ] YOLOv8 vision node (camera subscription & mask publishing)
+
+### Phase 2: Perception
+- [x] YOLOv8 vision node (camera subscription & mask publishing)
+
+### Phase 3: Core Flight Control
+- [x] Autopilot state machine (Takeoff, Navigate, Land)
+- [x] Basic reactive obstacle dodging
+
+### Phase 4: LiDAR Obstacle Detection
 - [ ] LiDAR point cloud processing node
-- [ ] Topology mapping & altitude control logic
+- [ ] Emergency stop based on proximity
+
+### Phase 5: Nav2 Path Planning
 - [ ] Nav2 semantic costmap integration
+- [ ] Global & Local Path Planning (A* / DWB)
+
+### Phase 6: Topology & Terrain
+- [ ] Topology mapping & altitude control logic
+
+### Phase 7: Ground Control Station (GCS)
+- [ ] Web UI, Telemetry, Video Stream, Waypoint Control
+
+### Phase 8: Real-World Deployment
 - [ ] Hardware deployment (Jetson Nano + Pixhawk)
 - [ ] Real-world flight testing
 
