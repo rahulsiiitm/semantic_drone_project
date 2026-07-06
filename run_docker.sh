@@ -13,6 +13,7 @@ docker run -it --rm \
     --net=host \
     --ipc=host \
     --device=/dev/video0:/dev/video0 \
+    --device=/dev/dri:/dev/dri \
     --env="DISPLAY=$DISPLAY" \
     --env="QT_X11_NO_MITSHM=1" \
     --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \

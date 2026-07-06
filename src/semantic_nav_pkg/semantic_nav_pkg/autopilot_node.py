@@ -8,6 +8,10 @@ from geometry_msgs.msg import Twist
 import numpy as np
 import math
 from enum import Enum
+from rclpy.action import ActionClient
+from nav2_msgs.action import NavigateToPose
+from tf2_ros import TransformBroadcaster
+from geometry_msgs.msg import TransformStamped
 
 class FlightState(Enum):
     IDLE = 0
@@ -46,6 +50,13 @@ class AutopilotNode(Node):
         self.cmd_vel_subscriber = self.create_subscription(
             Twist, '/cmd_vel', self.cmd_vel_callback, 10)
 
+        # Nav2 Action Client
+        self.nav_to_pose_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+
+        # TF Broadcaster
+        self.tf_broadcaster = TransformBroadcaster(self)
+
+
         # State Variables
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
         self.offboard_setpoint_counter = 0
@@ -78,6 +89,20 @@ class AutopilotNode(Node):
         # Extract yaw from quaternion
         q = msg.q
         self.drone_yaw = math.atan2(2.0 * (q[0] * q[3] + q[1] * q[2]), 1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3]))
+
+        # Broadcast TF
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'odom'
+        t.child_frame_id = 'base_link'
+        t.transform.translation.x = float(msg.position[0])
+        t.transform.translation.y = float(msg.position[1])
+        t.transform.translation.z = float(msg.position[2])
+        t.transform.rotation.x = float(q[0])
+        t.transform.rotation.y = float(q[1])
+        t.transform.rotation.z = float(q[2])
+        t.transform.rotation.w = float(q[3])
+        self.tf_broadcaster.sendTransform(t)
 
     def cmd_vel_callback(self, msg):
         # Nav2 outputs /cmd_vel in the base_link frame (X is forward, Y is lateral)
@@ -160,6 +185,7 @@ class AutopilotNode(Node):
             if abs(altitude_error) < 0.5:
                 self.get_logger().info('Takeoff complete. Switching to NAVIGATE.')
                 self.flight_state = FlightState.NAVIGATE
+                self.send_nav2_goal(5.0, 0.0) # Fly 5 meters forward automatically
 
         elif self.flight_state == FlightState.NAVIGATE:
             # Altitude holding
@@ -209,6 +235,42 @@ class AutopilotNode(Node):
 
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         self.trajectory_setpoint_publisher.publish(msg)
+
+    def send_nav2_goal(self, x, y):
+        self.get_logger().info(f'Sending Nav2 Goal: x={x}, y={y}')
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose.header.frame_id = 'map'
+        goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
+        
+        # Position
+        goal_msg.pose.pose.position.x = x
+        goal_msg.pose.pose.position.y = y
+        goal_msg.pose.pose.position.z = 0.0
+        
+        # Orientation (facing forward)
+        goal_msg.pose.pose.orientation.w = 1.0
+
+        if not self.nav_to_pose_client.wait_for_server(timeout_sec=5.0):
+            self.get_logger().error('Nav2 Action Server not available!')
+            return
+
+        self.send_goal_future = self.nav_to_pose_client.send_goal_async(goal_msg)
+        self.send_goal_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Nav2 Goal rejected.')
+            return
+
+        self.get_logger().info('Nav2 Goal accepted.')
+        self._get_result_future = goal_handle.get_result_async()
+        self._get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        self.get_logger().info('Nav2 Goal Reached! Switching to LAND.')
+        self.flight_state = FlightState.LAND
 
     def publish_vehicle_command(self, command, **kwargs):
         msg = VehicleCommand()

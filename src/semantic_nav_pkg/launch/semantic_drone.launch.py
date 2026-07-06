@@ -11,6 +11,8 @@ def generate_launch_description():
     
     nav2_params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
 
+    rviz_config_file = os.path.join(pkg_share, 'config', 'default.rviz')
+
     # Nav2 Stack (The Brain)
     nav2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(nav2_share, 'launch', 'navigation_launch.py')),
@@ -20,15 +22,32 @@ def generate_launch_description():
         }.items()
     )
 
+    # Static TF map -> odom (Assuming no SLAM drift)
+    tf_map_odom = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom']
+    )
+
+    # Static TF base_link -> camera_link (Camera is mounted slightly forward)
+    tf_base_camera = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0.1', '0', '0', '0', '0', '0', 'base_link', 'camera_link']
+    )
+
     # RViz (The Visualizer)
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
         output='screen',
-        name='rviz_visualizer'
+        name='rviz_visualizer',
+        arguments=['-d', rviz_config_file]
     )
 
     return LaunchDescription([
         nav2_launch,
+        tf_map_odom,
+        tf_base_camera,
         rviz_node
     ])

@@ -8,8 +8,12 @@ if [ -z "$CONTAINER_ID" ]; then
     exit 1
 fi
 
+echo "📦 Ensuring ROS-Gazebo Bridge is installed..."
+docker exec $CONTAINER_ID bash -c "sudo apt-get update > /dev/null && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ros-humble-ros-gz ros-humble-nav2-bringup > /dev/null"
+
 echo "🚀 Compiling the Autopilot Workspace..."
 docker exec $CONTAINER_ID bash -c "cd ~/workspace && colcon build --packages-select semantic_nav_pkg semantic_vision_pkg"
+docker exec $CONTAINER_ID bash -c "cp -r ~/workspace/src/semantic_nav_pkg/config/* ~/workspace/install/semantic_nav_pkg/share/semantic_nav_pkg/config/"
 
 echo "✅ Compilation Complete! Launching the Autonomous Fleet..."
 
@@ -22,12 +26,7 @@ docker exec -d $CONTAINER_ID bash -c "~/workspace/Micro-XRCE-DDS-Agent/build/Mic
 sleep 2
 
 echo "2/4 Starting ROS-Gazebo Bridge (Camera Feed & Depth Cloud)..."
-docker exec -d $CONTAINER_ID bash -c "source /opt/ros/humble/setup.bash && ros2 run ros_gz_bridge parameter_bridge \
-    /world/default/model/x500_depth_0/link/camera_link/sensor/IMX214/image@sensor_msgs/msg/Image@gz.msgs.Image \
-    /world/walls/model/x500_depth_0/link/camera_link/sensor/IMX214/image@sensor_msgs/msg/Image@gz.msgs.Image \
-    /depth_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked \
-    --ros-args -r /world/default/model/x500_depth_0/link/camera_link/sensor/IMX214/image:=/camera/image_raw \
-    -r /world/walls/model/x500_depth_0/link/camera_link/sensor/IMX214/image:=/camera/image_raw"
+docker exec -d $CONTAINER_ID bash -c "source /opt/ros/humble/setup.bash && ros2 run ros_gz_bridge parameter_bridge /world/default/model/x500_depth_0/link/camera_link/sensor/IMX214/image@sensor_msgs/msg/Image@gz.msgs.Image /world/baylands/model/x500_depth_0/link/camera_link/sensor/IMX214/image@sensor_msgs/msg/Image@gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked /world/baylands/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock --ros-args -r /world/baylands/clock:=/clock -r /world/default/model/x500_depth_0/link/camera_link/sensor/IMX214/image:=/camera/image_raw -r /world/baylands/model/x500_depth_0/link/camera_link/sensor/IMX214/image:=/camera/image_raw"
 sleep 2
 
 echo "3/4 Starting YOLOv8 Semantic Vision Node..."
