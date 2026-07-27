@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python AI libraries (Pin numpy < 2 and opencv < 4.9 for cv_bridge compatibility)
-RUN pip3 install --no-cache-dir ultralytics "opencv-python==4.8.1.78" "numpy<2"
+RUN pip3 install --no-cache-dir ultralytics "opencv-python==4.8.1.78" "numpy<2" gymnasium stable-baselines3[extra] tensorboard "setuptools==58.2.0"
 
 # Add a non-root user matching the host user to avoid permission issues with mounted volumes
 ARG USERNAME=drone_user

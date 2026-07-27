@@ -1,0 +1,141 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+  <world name="training_world">
+    <!-- Base physics and light -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Obstacles for RL Training -->
+    <model name="box1">
+      <pose>3 0 0.5 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="cylinder_1">
+      <pose>5 2 1 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>2</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.5</radius>
+              <length>2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0 0 1 1</ambient>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="box2">
+      <pose>7 -1 0.5 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1 2 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1 2 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0 1 0 1</ambient>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Walls surrounding the training area -->
+    <model name="wall_n">
+      <pose>10 0 1 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 10 2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 10 2</size></box></geometry>
+        </visual>
+      </link>
+    </model>
+    
+    <model name="wall_s">
+      <pose>-2 0 1 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 10 2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 10 2</size></box></geometry>
+        </visual>
+      </link>
+    </model>
+    
+    <model name="wall_e">
+      <pose>4 5 1 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>12 0.1 2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>12 0.1 2</size></box></geometry>
+        </visual>
+      </link>
+    </model>
+    
+    <model name="wall_w">
+      <pose>4 -5 1 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>12 0.1 2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>12 0.1 2</size></box></geometry>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
